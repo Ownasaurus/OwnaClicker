@@ -22,3 +22,26 @@ jobs:
     - name: Run MSBuild
       id: run_msbuild
       run: msbuild .\OwnaClicker.sln -property:Configuration=Release -property:Platform="x86"
+
+    - name: Create Latest Release
+      id: create_release
+      uses: GongT/actions-recreate-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+      with:
+        tag_name: alpha
+        release_name: Latest Version
+        body: Auto build from ${{ github.sha }} (master)
+        draft: false
+        prerelease: true
+
+    - name: Upload Bin Release Asset
+      id: upload-release-asset-bin
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: .\OwnaClicker\Release\OwnaClicker.exe
+        asset_name: OwnaClicker.exe
+        asset_content_type: application/octet-stream
