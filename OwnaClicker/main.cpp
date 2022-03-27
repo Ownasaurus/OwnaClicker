@@ -102,7 +102,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         0,
         CLASS_NAME,
         L"OwnaClicker",
-        WS_OVERLAPPEDWINDOW,
+        WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT,
         400, 200,
         NULL,
@@ -116,13 +116,26 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         return 0;
     }
 
+    // group box
+    CreateWindow(
+        L"Button",
+        L"Settings:",
+        WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
+        10, 5,
+        220,150,
+        hWndMain,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL
+    );
+
     // text label
     CreateWindow(
         L"STATIC",
-        L"Select window to click:",
+        L"Window to click:",
         WS_CHILD | WS_VISIBLE,
-        10, 10,
-        200, 200,
+        20, 30,
+        200, 20,
         hWndMain,
         NULL,
         (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
@@ -133,8 +146,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     hWndComboBox = CreateWindow(
         WC_COMBOBOX,
         L"",
-        CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL,
-        10, 30,
+        CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL,
+        20, 50,
         200, 200,
         hWndMain,
         NULL,
@@ -147,27 +160,25 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         L"STATIC",
         L"Enter time to sleep (ms):",
         WS_CHILD | WS_VISIBLE,
-        10, 70,
-        200, 200,
+        20, 90,
+        200, 20,
         hWndMain,
         NULL,
         (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
         NULL
     );
 
-    // sleep time
+    // Edit box (sleep time)
     hSleepText = CreateWindow(
         L"EDIT",
         L"1500",
-        WS_CHILD | WS_VISIBLE,
-        10, 90,
+        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        20, 110,
         100, 20,
         hWndMain,
         (HMENU)IDC_SLEEP_TEXT,
         (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
         NULL);
-
-    
 
     // the best button ever
     hWndButton = CreateWindow(
@@ -196,6 +207,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         0,                      // use default creation flags 
         &dwThreadId);   // returns the thread identifier 
 
+    if (!hThread) {
+        MessageBox(hWndMain, L"Could not start thread! Exiting!", L"ERROR", NULL);
+        return 1;
+    }
+
     // message loop
     MSG msg = {};
 
@@ -223,6 +239,12 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     SendMessage(hWndComboBox, CB_GETLBTEXT, (WPARAM)index, (LPARAM)buffer.data());
 
                     hMinecraftWindow = FindWindow(NULL, buffer.data()); // (no need to close this handle)
+
+                    if (!hMinecraftWindow) {
+                        MessageBox(hWndMain, L"Could not get a handle to target window! Exiting!", L"ERROR", NULL);
+                        exit(1);
+                    }
+
                     SendMessage(hWndButton, WM_SETTEXT, 0, (LPARAM)L"Stop");
                 }
                 else // prepare to turn it off
@@ -256,7 +278,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             PAINTSTRUCT ps;
             HDC hdc = BeginPaint(hWnd, &ps);
 
-            FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW + 1));
+            FillRect(hdc, &ps.rcPaint, (HBRUSH)(COLOR_WINDOW));
 
             RECT square;
             square.left = 250;
