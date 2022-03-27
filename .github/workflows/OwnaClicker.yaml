@@ -17,8 +17,10 @@ jobs:
 
     - name: Setup MSBuild and add to PATH
       uses: microsoft/setup-msbuild@v1.1
+      with:
+        msbuild-architecture: x86
       id: setup_msbuild
 
     - name: Run MSBuild
       id: run_msbuild
-      run: msbuild .\OwnaClicker.sln
+      run: msbuild .\OwnaClicker.sln -property:Configuration=Release 
