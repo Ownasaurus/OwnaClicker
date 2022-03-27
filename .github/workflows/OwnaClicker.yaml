@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-      - master
+      - main
       - ga-test
 
 name: Compile and Update Latest Release
