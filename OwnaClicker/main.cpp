@@ -10,9 +10,11 @@
 // Various globals
 bool clicking = false;
 const int ID_BUTTON1 = 401;
+const int IDC_SLEEP_TEXT = 4001;
 HWND hWndComboBox = NULL;
 HWND hWndButton = NULL;
 HWND hWndMain = NULL;
+HWND hSleepText = NULL;
 HWND hMinecraftWindow = NULL;
 
 HANDLE hThread = NULL;
@@ -102,7 +104,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         L"OwnaClicker",
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        400, 400,
+        400, 200,
         NULL,
         NULL,
         hInstance,
@@ -114,11 +116,11 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         return 0;
     }
 
-    // drop down menu
-    hWndComboBox = CreateWindow(
-        WC_COMBOBOX,
-        L"",
-        CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL,
+    // text label
+    CreateWindow(
+        L"STATIC",
+        L"Select window to click:",
+        WS_CHILD | WS_VISIBLE,
         10, 10,
         200, 200,
         hWndMain,
@@ -127,10 +129,50 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         NULL
     );
 
+    // drop down menu
+    hWndComboBox = CreateWindow(
+        WC_COMBOBOX,
+        L"",
+        CBS_DROPDOWN | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE | WS_VSCROLL,
+        10, 30,
+        200, 200,
+        hWndMain,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL
+    );
+
+    // text label
+    CreateWindow(
+        L"STATIC",
+        L"Enter time to sleep (ms):",
+        WS_CHILD | WS_VISIBLE,
+        10, 70,
+        200, 200,
+        hWndMain,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL
+    );
+
+    // sleep time
+    hSleepText = CreateWindow(
+        L"EDIT",
+        L"1500",
+        WS_CHILD | WS_VISIBLE,
+        10, 90,
+        100, 20,
+        hWndMain,
+        (HMENU)IDC_SLEEP_TEXT,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL);
+
+    
+
     // the best button ever
     hWndButton = CreateWindow(
         L"BUTTON",
-        L"Run/Stop",
+        L"Start",
         WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
         250, 10,
         100, 30,
@@ -171,7 +213,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     switch (uMsg)
     {
         case WM_COMMAND:
-            if (wParam == ID_BUTTON1)
+            if (wParam == ID_BUTTON1) // button clicked
             {
                 if (!clicking) { // prepare to turn it on
                     const int index = SendMessage(hWndComboBox, CB_GETCURSEL, NULL, NULL);
@@ -181,6 +223,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                     SendMessage(hWndComboBox, CB_GETLBTEXT, (WPARAM)index, (LPARAM)buffer.data());
 
                     hMinecraftWindow = FindWindow(NULL, buffer.data()); // (no need to close this handle)
+                    SendMessage(hWndButton, WM_SETTEXT, 0, (LPARAM)L"Stop");
+                }
+                else // prepare to turn it off
+                {
+                    SendMessage(hWndButton, WM_SETTEXT, 0, (LPARAM)L"Start");
                 }
 
                 clicking = !clicking;
@@ -188,6 +235,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 // force redraw
                 InvalidateRect(hWnd, NULL, FALSE);
                 UpdateWindow(hWnd);
+            }
+            else if (LOWORD(wParam) == IDC_SLEEP_TEXT && HIWORD(wParam) == EN_CHANGE) // sleep text field changed
+            {
+                TCHAR buff[128];
+                GetWindowText(hSleepText, buff, sizeof(buff));
+                int conversion = _wtoi(buff);
+                if (conversion > 0) // 0 indicates error, negative is invalid
+                {
+                    clickPeriod = conversion;
+                }
             }
             break;
         case WM_DESTROY:
