@@ -21,5 +21,4 @@ jobs:
 
     - name: Run MSBuild
       id: run_msbuild
-      working-directory: $
       run: msbuild .\OwnaClicker.sln
