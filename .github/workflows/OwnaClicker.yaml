@@ -1,53 +1,47 @@
-name: "Build"
-
 on:
   push:
     branches:
-      - main
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.gitignore'
-      - '**/*.gitattributes'
-  pull_request:
-    branches:
-      - main
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.gitignore'
-      - '**/*.gitattributes'
-  workflow_dispatch:
-    branches:
-      - main
-    paths-ignore:
-      - '**/*.md'
-      - '**/*.gitignore'
-      - '**/*.gitattributes'
-      
+      - master
+      - ga-test
+
+name: Compile and Update Latest Release
+
 jobs:
   build:
-    name: Build 
-    runs-on: ubuntu-latest
-    env:
-      DOTNET_CLI_TELEMETRY_OPTOUT: 1
-      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
-      DOTNET_NOLOGO: true
-      DOTNET_GENERATE_ASPNET_CERTIFICATE: false
-      DOTNET_ADD_GLOBAL_TOOLS_TO_PATH: false
-      DOTNET_MULTILEVEL_LOOKUP: 0
-
+    name: Run MSBuild
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v2
-      
-    - name: Setup .NET Core SDK
-      uses: actions/setup-dotnet@v1.9.0
+    - name: Checkout code
+      uses: actions/checkout@v3.0.0
+      id: checkout_code
+
+    - name: Setup MSBuild and add to PATH
+      uses: microsoft/setup-msbuild@v1.1
+      id: setup_msbuild
+
+    - name: Run MSBuild
+      id: run_msbuild
+      run: msbuild .\OwnaClicker.sln -property:Configuration=Release -property:Platform="x86"
+
+    - name: Create Latest Release
+      id: create_release
+      uses: GongT/actions-recreate-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
       with:
-        dotnet-version: 6.0.x
+        tag_name: alpha
+        release_name: Latest Version
+        body: Auto build from ${{ github.sha }} (main)
+        draft: false
+        prerelease: true
 
-    - name: Restore
-      run: dotnet restore
-
-    - name: Build
-      run: dotnet build --configuration Release --no-restore
-
-    - name: Test
-      run: dotnet test
+    - name: Upload Bin Release Asset
+      id: upload-release-asset-bin
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+        asset_path: D:\a\OwnaClicker\OwnaClicker\Release\OwnaClicker.exe
+        asset_name: OwnaClicker.exe
+        asset_content_type: application/octet-stream
