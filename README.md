@@ -1,4 +1,4 @@
-Auto (left) clicker designed for minecraft. Customizable click rate.
+Auto clicker designed for minecraft. Customizable click rate.
 
 Only tested in Minecraft, where the click location does not matter.
 

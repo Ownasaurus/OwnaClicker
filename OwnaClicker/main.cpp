@@ -10,18 +10,27 @@
 
 // Various globals
 bool clicking = false;
+bool sleepTextChanged = false;
 const int ID_BUTTON1 = 401;
 const int IDC_SLEEP_TEXT = 4001;
+const int IDC_SLEEP_TEXT_GT = 4002;
+const int IDC_CHK_L = 40001;
+const int IDC_CHK_M = 40002;
+const int IDC_CHK_R = 40003;
 HWND hWndComboBox = NULL;
 HWND hWndButton = NULL;
 HWND hWndMain = NULL;
 HWND hSleepText = NULL;
+HWND hSleepTextGT = NULL;
 HWND hMinecraftWindow = NULL;
 
 HANDLE hThread = NULL;
 DWORD dwThreadId = NULL;
 
 int clickPeriod = 1500; // ms
+UINT clickDown = WM_LBUTTONDOWN;
+UINT clickUp = WM_LBUTTONUP;
+WPARAM clickButton = MK_LBUTTON;
 
 // Color brushes for the status rectangles
 HBRUSH solidColorRed = CreateSolidBrush(RGB(255, 0, 0));
@@ -33,8 +42,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 void ClickWindow(HWND hWnd)
 {
-    PostMessage(hWnd, WM_LBUTTONDOWN, MK_LBUTTON, 0);
-    PostMessage(hWnd, WM_LBUTTONUP, 0, 0);
+    PostMessage(hWnd, clickDown, clickButton, 0);
+    PostMessage(hWnd, clickUp, 0, 0);
 }
 
 DWORD WINAPI ClickyThread(LPVOID lpParam)
@@ -77,13 +86,20 @@ void RefreshWindowList()
 {
     windowNames.clear();
     EnumWindows(EnumWindowsProc, 0);
+    size_t startIndex = 0;
 
     for (size_t x = 0; x < windowNames.size(); x++)
     {
         SendMessage(hWndComboBox, CB_ADDSTRING, 0, (LPARAM)windowNames.at(x).c_str());
+
+        // by default, select something that has "Minecraft" in its name
+        if (windowNames.at(x).find(L"Minecraft") != std::string::npos)
+        {
+            startIndex = x;
+        }
     }
 
-    SendMessage(hWndComboBox, CB_SETCURSEL, 0, 0);
+    SendMessage(hWndComboBox, CB_SETCURSEL, startIndex, 0);
 }
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
@@ -106,7 +122,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         L"OwnaClicker",
         WS_OVERLAPPEDWINDOW ^ WS_THICKFRAME ^ WS_MAXIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT,
-        400, 200,
+        400, 250,
         NULL,
         NULL,
         hInstance,
@@ -121,10 +137,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     // group box
     CreateWindow(
         L"Button",
-        L"Settings:",
+        L"Settings",
         WS_CHILD | WS_VISIBLE | BS_GROUPBOX,
         10, 5,
-        220,150,
+        220,200,
         hWndMain,
         NULL,
         (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
@@ -143,7 +159,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
         NULL
     );
-
+    
     // drop down menu
     hWndComboBox = CreateWindow(
         WC_COMBOBOX,
@@ -160,7 +176,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     // text label
     CreateWindow(
         L"STATIC",
-        L"Enter time to sleep (ms):",
+        L"Enter time to sleep:",
         WS_CHILD | WS_VISIBLE,
         20, 90,
         200, 20,
@@ -174,20 +190,109 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     hSleepText = CreateWindow(
         L"EDIT",
         L"1500",
-        WS_CHILD | WS_VISIBLE | WS_BORDER,
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_RIGHT,
         20, 110,
-        100, 20,
+        60, 20,
         hWndMain,
         (HMENU)IDC_SLEEP_TEXT,
         (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
         NULL);
+
+    // text label
+    CreateWindow(
+        L"STATIC",
+        L"ms",
+        WS_CHILD | WS_VISIBLE,
+        82, 112,
+        20, 20,
+        hWndMain,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL
+    );
+
+    // Edit box (sleep time)
+    hSleepTextGT = CreateWindow(
+        L"EDIT",
+        L"30",
+        WS_CHILD | WS_VISIBLE | WS_BORDER | ES_RIGHT,
+        130, 110,
+        60, 20,
+        hWndMain,
+        (HMENU)IDC_SLEEP_TEXT_GT,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL);
+
+    // text label
+    CreateWindow(
+        L"STATIC",
+        L"gt",
+        WS_CHILD | WS_VISIBLE,
+        192, 112,
+        20, 20,
+        hWndMain,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL
+    );
+
+    // text label
+    CreateWindow(
+        L"STATIC",
+        L"Mouse button:",
+        WS_CHILD | WS_VISIBLE,
+        20, 150,
+        200, 20,
+        hWndMain,
+        NULL,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL
+    );
+
+    // radio buttons for mouse click type
+    CreateWindowEx(WS_EX_WINDOWEDGE,
+        L"BUTTON",
+        L"Left",
+        WS_VISIBLE | WS_CHILD | BS_AUTORADIOBUTTON | WS_GROUP,
+        20, 170,
+        60, 20,
+        hWndMain,
+        (HMENU)IDC_CHK_L,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL);
+
+    // radio buttons for mouse click type
+    CreateWindowEx(WS_EX_WINDOWEDGE,
+        L"BUTTON",
+        L"Middle",
+        WS_VISIBLE | WS_CHILD | BS_AUTORADIOBUTTON,
+        80, 170,
+        65, 20,
+        hWndMain,
+        (HMENU)IDC_CHK_M,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL);
+
+    // radio buttons for mouse click type
+    CreateWindowEx(WS_EX_WINDOWEDGE,
+        L"BUTTON",
+        L"Right",
+        WS_VISIBLE | WS_CHILD | BS_AUTORADIOBUTTON,
+        160, 170,
+        60, 20,
+        hWndMain,
+        (HMENU)IDC_CHK_R,
+        (HINSTANCE)GetWindowLongPtr(hWndMain, GWLP_HINSTANCE),
+        NULL);
+
+    SendDlgItemMessage(hWndMain, IDC_CHK_L, BM_SETCHECK, 1, 0);
 
     // the best button ever
     hWndButton = CreateWindow(
         L"BUTTON",
         L"Start",
         WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
-        250, 10,
+        250, 20,
         100, 30,
         hWndMain,
         (HMENU)ID_BUTTON1,
@@ -202,12 +307,12 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     // start up our background clicking thread
     hThread = CreateThread(
-        NULL,                   // default security attributes
-        0,                      // use default stack size  
-        ClickyThread,       // thread function name
-        0,          // argument to thread function 
-        0,                      // use default creation flags 
-        &dwThreadId);   // returns the thread identifier 
+        NULL,
+        0,
+        ClickyThread,
+        0,
+        0,
+        &dwThreadId);
 
     if (!hThread) {
         MessageBox(hWndMain, L"Could not start thread! Exiting!", L"ERROR", NULL);
@@ -260,14 +365,67 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                 InvalidateRect(hWnd, NULL, FALSE);
                 UpdateWindow(hWnd);
             }
+            else if (wParam == IDC_CHK_L)
+            {
+                clickDown = WM_LBUTTONDOWN;
+                clickUp = WM_LBUTTONUP;
+                clickButton = MK_LBUTTON;
+            }
+            else if (wParam == IDC_CHK_M)
+            {
+                clickDown = WM_MBUTTONDOWN;
+                clickUp = WM_MBUTTONUP;
+                clickButton = MK_MBUTTON;
+            }
+            else if (wParam == IDC_CHK_R)
+            {
+                clickDown = WM_RBUTTONDOWN;
+                clickUp = WM_RBUTTONUP;
+                clickButton = MK_RBUTTON;
+            }
             else if (LOWORD(wParam) == IDC_SLEEP_TEXT && HIWORD(wParam) == EN_CHANGE) // sleep text field changed
             {
-                TCHAR buff[128];
-                GetWindowText(hSleepText, buff, sizeof(buff));
-                int conversion = _wtoi(buff);
-                if (conversion > 0) // 0 indicates error, negative is invalid
+                if (!sleepTextChanged)
                 {
-                    clickPeriod = conversion;
+                    sleepTextChanged = true;
+                    TCHAR buff[128];
+                    GetWindowText(hSleepText, buff, sizeof(buff));
+                    int conversion = _wtoi(buff);
+                    if (conversion > 0) // 0 indicates error, negative is invalid
+                    {
+                        clickPeriod = conversion;
+                    }
+
+                    conversion /= 50;
+                    _itow_s(conversion, buff, 128, 10);
+                    SetWindowText(hSleepTextGT, buff);
+                }
+                else
+                {
+                    sleepTextChanged = false;
+                }
+            }
+            else if (LOWORD(wParam) == IDC_SLEEP_TEXT_GT && HIWORD(wParam) == EN_CHANGE) // sleep text field changed
+            {
+                if (!sleepTextChanged)
+                {
+                    sleepTextChanged = true;
+                    TCHAR buff[128];
+                    GetWindowText(hSleepTextGT, buff, sizeof(buff));
+                    int conversion = _wtoi(buff);
+
+                    conversion *= 50;
+                    if (conversion > 0) // 0 indicates error, negative is invalid
+                    {
+                        clickPeriod = conversion;
+                    }
+
+                    _itow_s(conversion, buff, 128, 10);
+                    SetWindowText(hSleepText, buff);
+                }
+                else
+                {
+                    sleepTextChanged = false;
                 }
             }
             break;
@@ -285,8 +443,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             RECT square;
             square.left = 250;
             square.right = 350;
-            square.top = 50;
-            square.bottom = 150;
+            square.top = 75;
+            square.bottom = 175;
 
             if (clicking) {
                 FillRect(hdc, &square, solidColorGreen);
