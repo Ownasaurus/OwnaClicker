@@ -6,6 +6,7 @@
 #include <vector>
 #include <windows.h>
 #include <commctrl.h>
+#include <strsafe.h>
 #include "resource.h"
 
 // Various globals
@@ -26,6 +27,7 @@ HWND hMinecraftWindow = NULL;
 
 HANDLE hThread = NULL;
 DWORD dwThreadId = NULL;
+DWORD dwKeyboardThreadId = NULL;
 
 int clickPeriod = 1500; // ms
 UINT clickDown = WM_LBUTTONDOWN;
@@ -39,6 +41,66 @@ HBRUSH solidColorGreen = CreateSolidBrush(RGB(0, 255, 0));
 std::vector <std::wstring> windowNames;
 
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+// function to display error codes and exit from MSDN
+void ErrorExit(LPTSTR lpszFunction)
+{
+    // Retrieve the system error message for the last-error code
+
+    LPVOID lpMsgBuf;
+    LPVOID lpDisplayBuf;
+    DWORD dw = GetLastError();
+
+    FormatMessage(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL,
+        dw,
+        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+        (LPTSTR)&lpMsgBuf,
+        0, NULL);
+
+    // Display the error message and exit the process
+
+    lpDisplayBuf = (LPVOID)LocalAlloc(LMEM_ZEROINIT,
+        (lstrlen((LPCTSTR)lpMsgBuf) + lstrlen((LPCTSTR)lpszFunction) + 40) * sizeof(TCHAR));
+    StringCchPrintf((LPTSTR)lpDisplayBuf,
+        LocalSize(lpDisplayBuf) / sizeof(TCHAR),
+        TEXT("%s failed with error %d: %s"),
+        lpszFunction, dw, lpMsgBuf);
+    MessageBox(NULL, (LPCTSTR)lpDisplayBuf, TEXT("Error"), MB_OK);
+
+    LocalFree(lpMsgBuf);
+    LocalFree(lpDisplayBuf);
+    ExitProcess(dw);
+}
+
+LRESULT CALLBACK LowLevelKeyboardProc(int code, WPARAM wParam, LPARAM lParam)
+{
+    // ignore and pass if code < 0 per win32 protocol
+    if (code < 0)
+    {
+        return CallNextHookEx(NULL, code, wParam, lParam);
+    }
+
+    // process this message
+    if (code == 0)
+    {
+        if (wParam == WM_KEYDOWN)
+        {
+            KBDLLHOOKSTRUCT *keyInfo = (KBDLLHOOKSTRUCT*)lParam;
+            // toggle on F6
+            if (keyInfo->vkCode == VK_F6)
+            {
+                // simulate button pressed
+                SendMessage(hWndMain, WM_COMMAND, MAKEWPARAM(ID_BUTTON1, BN_CLICKED), (LPARAM)hWndButton);
+            }
+        }
+    }
+
+    return CallNextHookEx(NULL, code, wParam, lParam);
+}
 
 void ClickWindow(HWND hWnd)
 {
@@ -290,7 +352,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     // the best button ever
     hWndButton = CreateWindow(
         L"BUTTON",
-        L"Start",
+        L"Start (F6)",
         WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,
         250, 20,
         100, 30,
@@ -316,6 +378,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     if (!hThread) {
         MessageBox(hWndMain, L"Could not start thread! Exiting!", L"ERROR", NULL);
+        return 1;
+    }
+
+    // initialize simple keyboard hook
+    if (SetWindowsHookEx(WH_KEYBOARD_LL, LowLevelKeyboardProc, hInstance, dwKeyboardThreadId) == NULL)
+    {
+        //MessageBox(hWndMain, L"Failed to initialize keyboard hook! Exiting!", L"ERROR", NULL);
+        ErrorExit((LPTSTR)TEXT("SetWindowsHookEx"));
         return 1;
     }
 
@@ -352,11 +422,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
                         exit(1);
                     }
 
-                    SendMessage(hWndButton, WM_SETTEXT, 0, (LPARAM)L"Stop");
+                    SendMessage(hWndButton, WM_SETTEXT, 0, (LPARAM)L"Stop (F6)");
                 }
                 else // prepare to turn it off
                 {
-                    SendMessage(hWndButton, WM_SETTEXT, 0, (LPARAM)L"Start");
+                    SendMessage(hWndButton, WM_SETTEXT, 0, (LPARAM)L"Start (F6)");
                 }
 
                 clicking = !clicking;
